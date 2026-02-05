@@ -4,6 +4,7 @@
 namespace Menu
 {
     bool g_bClientMove = false;
+    bool g_bShowCallTraces = false;
     char g_szCallTraceFilter[1024]{};
     bool g_bCallTraceFilterSubclasses = false;
     std::string g_sCallTraceFilter{};
@@ -134,12 +135,16 @@ namespace Menu
         }
 #ifdef _DEBUG
         ImGui::Checkbox("Debug ESP (Show Class Names)", &espConfig.bDebugESP);
+        ImGui::Separator();
+        ImGui::Checkbox("Show Call Traces", &g_bShowCallTraces);
 #endif
 
         ImGui::End();
 
 
-        ImGui::Begin("Call Traces",  &bShowMenu);
+        if (g_bShowCallTraces)
+        {
+            ImGui::Begin("Call Traces", &g_bShowCallTraces);
         if(ImGui::Button("Clear"))
             ImGui::OpenPopup("Confirm Clear");
             
@@ -172,6 +177,7 @@ namespace Menu
             pairEntry.second.Draw();
         
         ImGui::End();
+        }
     }
 
     void PostDraw() {}
