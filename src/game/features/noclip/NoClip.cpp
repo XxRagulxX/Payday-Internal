@@ -1,4 +1,5 @@
 #include "NoClip.hpp"
+#include "game/frontend/Menu.hpp"  // For speed slider
 
 namespace NoClip
 {
@@ -16,7 +17,11 @@ namespace NoClip
         // Disable gravity and increase control
         pMovementComponent->GravityScale = 0.0f;
         pMovementComponent->BrakingDecelerationFlying = 8000.0f;  // High deceleration = stops quickly
-        pMovementComponent->MaxFlySpeed = 2000.0f;  // Controllable speed
+        
+        // Use speed multiplier from menu slider (increased base speed for faster movement)
+        float baseSpeed = 2000.0f;  // Increased from 1000.0f
+        pMovementComponent->MaxFlySpeed = baseSpeed * Menu::g_fNoClipSpeed;
+        pMovementComponent->MaxAcceleration = 10000.0f;  // Faster acceleration
         
         // Reset velocity when not moving (prevents drifting)
         SDK::FVector currentVelocity = pMovementComponent->Velocity;

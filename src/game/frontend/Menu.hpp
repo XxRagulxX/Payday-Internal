@@ -11,6 +11,7 @@
 namespace Menu
 {
     extern bool g_bClientMove;
+    extern float g_fNoClipSpeed;  // Speed multiplier for noclip
     extern bool g_bShowCallTraces;
     extern char g_szCallTraceFilter[1024];
     extern bool g_bCallTraceFilterSubclasses;

@@ -9,6 +9,7 @@ namespace Globals {
 namespace Menu
 {
     bool g_bClientMove = false;
+    float g_fNoClipSpeed = 5.0f;  // Default speed multiplier (1.0 = normal, 10.0 = very fast)
     bool g_bShowCallTraces = false;
     char g_szCallTraceFilter[1024]{};
     bool g_bCallTraceFilterSubclasses = false;
@@ -120,6 +121,16 @@ namespace Menu
             }
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("Fly through walls and objects\nWASD to move, look direction to fly up/down");
+            
+            // Speed slider (only show when noclip is enabled)
+            if (g_bClientMove)
+            {
+                ImGui::Indent();
+                ImGui::SliderFloat("Speed", &g_fNoClipSpeed, 1.0f, 100.0f, "%.1fx");
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("1x = Slow, 10x = Fast, 50x = Very Fast, 100x = Extreme!");
+                ImGui::Unindent();
+            }
         }
         
         ImGui::Separator();
