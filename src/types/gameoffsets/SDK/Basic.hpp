@@ -127,7 +127,7 @@ class UClass* GetStaticBPGeneratedClass(const char* Name, int32& ClassIdx, uint6
 		if (ClassIdx == 0x0) [[unlikely]]
 			return SetClassIndex(BasicFilesImpleUtils::FindClassByFullName(Name), ClassIdx, ClassNameIdx);
 
-		UClass* ClassObj = reinterpret_cast<UClass*>(BasicFilesImpleUtils::GetObjectByIndex(ClassIdx));
+		UClass* ClassObj = static_cast<UClass*>(BasicFilesImpleUtils::GetObjectByIndex(ClassIdx));
 
 		/* Could use cast flags too to save some string comparisons */
 		if (!ClassObj || BasicFilesImpleUtils::GetObjFNameAsUInt64(ClassObj) != ClassNameIdx)
@@ -140,7 +140,7 @@ class UClass* GetStaticBPGeneratedClass(const char* Name, int32& ClassIdx, uint6
 		if (ClassIdx == 0x0) [[unlikely]]
 			return SetClassIndex(BasicFilesImpleUtils::FindClassByName(Name), ClassIdx, ClassNameIdx);
 
-		UClass* ClassObj = reinterpret_cast<UClass*>(BasicFilesImpleUtils::GetObjectByIndex(ClassIdx));
+		UClass* ClassObj = static_cast<UClass*>(BasicFilesImpleUtils::GetObjectByIndex(ClassIdx));
 
 		/* Could use cast flags too to save some string comparisons */
 		if (!ClassObj || BasicFilesImpleUtils::GetObjFNameAsUInt64(ClassObj) != ClassNameIdx)
@@ -157,7 +157,7 @@ ClassType* GetDefaultObjImpl()
 
 	if (StaticClass)
 	{
-		return reinterpret_cast<ClassType*>(*reinterpret_cast<void**>(reinterpret_cast<uintptr_t>(StaticClass) + 0xB0));
+		return reinterpret_cast<ClassType*>(StaticClass->ClassDefaultObject);
 	}
 
 	return nullptr;
@@ -745,7 +745,7 @@ template<typename FunctionSignature>
 class TDelegate
 {
 public:
-// 	struct InvalidUseOfTDelegate                  TemplateParamIsNotAFunctionSignature;              // 0x0000(0x0000)(NOT AUTO-GENERATED PROPERTY)
+ 	struct InvalidUseOfTDelegate                  TemplateParamIsNotAFunctionSignature;              // 0x0000(0x0000)(NOT AUTO-GENERATED PROPERTY)
 	uint8                                         Pad_0[0x14];                                       // 0x0000(0x0014)(Fixing Struct Size After Last Property [ Dumper-7 ])
 };
 
@@ -764,7 +764,7 @@ template<typename FunctionSignature>
 class TMulticastInlineDelegate
 {
 public:
-// 	struct InvalidUseOfTMulticastInlineDelegate   TemplateParamIsNotAFunctionSignature;              // 0x0000(0x0014)(NOT AUTO-GENERATED PROPERTY)
+	struct InvalidUseOfTMulticastInlineDelegate   TemplateParamIsNotAFunctionSignature;              // 0x0000(0x0014)(NOT AUTO-GENERATED PROPERTY)
 };
 
 // Predefined struct TMulticastInlineDelegate<Ret(Args...)>

@@ -73,21 +73,23 @@ namespace Menu
             return;
 
         ESP::Render(pGWorld, pPlayerController);
-        ESP::RenderDebugESP(pPersistentLevel, pPlayerController);
     }
 
     void DrawEnemyESPSection(const char* szType, ESP::EnemyESP& stSettings)
     {
-        if(!ImGui::BeginCombo(szType, std::format("{}###{}", stSettings.m_sPreviewText, szType).c_str()))
+        if (!ImGui::BeginCombo(
+            szType,
+            std::format("{}###{}", stSettings.m_sPreviewText, szType).c_str()))
             return;
 
-        if (ImGui::Selectable("Box", &stSettings.m_bBox) ||
-            ImGui::Selectable("Health", &stSettings.m_bHealth) ||
-            ImGui::Selectable("Armor", &stSettings.m_bArmor) ||
-            ImGui::Selectable("Name", &stSettings.m_bName) ||
-            ImGui::Selectable("Flags", &stSettings.m_bFlags) ||
-            ImGui::Selectable("Skeleton", &stSettings.m_bSkeleton) ||
-            ImGui::Selectable("Outline", &stSettings.m_bOutline))
+        bool changed = false;
+
+        changed |= ImGui::Selectable("Box", &stSettings.m_bBox);
+        changed |= ImGui::Selectable("Health", &stSettings.m_bHealth);
+        changed |= ImGui::Selectable("Name", &stSettings.m_bName);
+        changed |= ImGui::Selectable("Outline", &stSettings.m_bOutline);
+
+        if (changed)
             stSettings.UpdatePreviewText();
 
         ImGui::EndCombo();
@@ -121,28 +123,30 @@ namespace Menu
 
             DrawEnemyESPSection("Normal Enemies", espConfig.m_stNormalEnemies);
             DrawEnemyESPSection("Special Enemies", espConfig.m_stSpecialEnemies);
-
-#ifdef _DEBUG
-            ImGui::Checkbox("Debug Draw Bone Indices", &espConfig.bDebugDrawBoneIndices);
-            ImGui::Checkbox("Debug Draw Bone Names Instead of Indices", &espConfig.bDebugDrawBoneNames);
-#endif
-            
-#ifdef _DEBUG
-            ImGui::Checkbox("Debug Skeleton", &espConfig.bDebugSkeleton);
-            if (espConfig.bDebugSkeleton) {
-                ImGui::Indent();
-                ImGui::Checkbox("Debug Skeleton Draw Bone Indices", &espConfig.bDebugSkeletonDrawBoneIndices);
-                ImGui::Checkbox("Debug Skeleton Draw Bone Names Instead of Indices", &espConfig.bDebugSkeletonDrawBoneNames);
-                ImGui::Unindent();
-            }
-#endif
-            ImGui::Unindent();
         }
-#ifdef _DEBUG
-        ImGui::Checkbox("Debug ESP (Show Class Names)", &espConfig.bDebugESP);
-        ImGui::Separator();
-        ImGui::Checkbox("Show Call Traces", &g_bShowCallTraces);
-#endif
+
+
+//#ifdef _DEBUG
+//            ImGui::Checkbox("Debug Draw Bone Indices", &espConfig.bDebugDrawBoneIndices);
+//            ImGui::Checkbox("Debug Draw Bone Names Instead of Indices", &espConfig.bDebugDrawBoneNames);
+//#endif
+//            
+//#ifdef _DEBUG
+//            ImGui::Checkbox("Debug Skeleton", &espConfig.bDebugSkeleton);
+//            if (espConfig.bDebugSkeleton) {
+//                ImGui::Indent();
+//                ImGui::Checkbox("Debug Skeleton Draw Bone Indices", &espConfig.bDebugSkeletonDrawBoneIndices);
+//                ImGui::Checkbox("Debug Skeleton Draw Bone Names Instead of Indices", &espConfig.bDebugSkeletonDrawBoneNames);
+//                ImGui::Unindent();
+//            }
+//#endif
+//            ImGui::Unindent();
+//        }
+//#ifdef _DEBUG
+//        ImGui::Checkbox("Debug ESP (Show Class Names)", &espConfig.bDebugESP);
+//        ImGui::Separator();
+//        ImGui::Checkbox("Show Call Traces", &g_bShowCallTraces);
+//#endif
 
         ImGui::Separator();
         
