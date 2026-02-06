@@ -5,7 +5,7 @@
 #include <format>
 #include <optional>
 #include <filesystem>
-#include <minhook.h>
+#include <MinHook.h>
 #include <iostream>
 #include <fstream>
 #include <ios>
