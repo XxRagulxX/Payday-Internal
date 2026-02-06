@@ -1,5 +1,5 @@
 #include "ESP.hpp"
-#include "../SDK.hpp"
+#include "types/gameoffsets/SDK.hpp"
 #include "core/logging/Logging.hpp"
 
 #include <imgui.h>
@@ -241,41 +241,52 @@ namespace ESP
 
     
     EActorType DetermineActorType(SDK::AActor* pActor){
-        if (pActor->IsA(SDK::ACH_SWAT_SHIELD_C::StaticClass()))
-            return EActorType::Shield;
-        else if (pActor->IsA(SDK::ACH_Dozer_C::StaticClass()))
-            return EActorType::Dozer;
-        else if (pActor->IsA(SDK::ACH_Cloaker_C::StaticClass()))
-            return EActorType::Cloaker;
-        else if (pActor->IsA(SDK::ACH_Sniper_C::StaticClass()))
-            return EActorType::Sniper;
-        else if (pActor->IsA(SDK::ACH_Grenadier_C::StaticClass()))
-            return EActorType::Grenadier;
-        else if (pActor->IsA(SDK::ACH_Taser_C::StaticClass()))
-            return EActorType::Taser;
-        else if (pActor->IsA(SDK::ACH_Tower_C::StaticClass()))
-            return EActorType::Techie;
-
-        if(pActor->IsA(SDK::ACH_BaseCop_C::StaticClass()))
-            return EActorType::Guard;
-
-        if(pActor->IsA(SDK::ACH_BaseCivilian_C::StaticClass()))
+        if (!pActor || !pActor->Class)
+            return EActorType::Other;
+        
+        std::string className = pActor->Class->Name.ToString();
+        
+        // Check for civilians FIRST (before other AI checks)
+        if (className.find("Civilian") != std::string::npos)
             return EActorType::Civilian;
-
-        static std::vector<SDK::UClass*> aObjectiveItemClasses = {
-            SDK::ABP_RFIDTagBase_C::StaticClass(),
-            SDK::ABP_KeycardBase_C::StaticClass(),
-            SDK::ABP_CarriedInteractableBase_C::StaticClass(),
-            SDK::UGE_CarKeys_C::StaticClass(),
-            SDK::UGA_Phone_C::StaticClass()
-        };
-        if(!std::none_of(aObjectiveItemClasses.begin(), aObjectiveItemClasses.end(), [pActor](SDK::UClass* pClass) { return pActor->IsA(pClass); }))
+        
+        // Check for special enemy types by class name (Blueprint classes)
+        if (className.find("CH_SWAT_SHIELD") != std::string::npos || className.find("SWAT_SHIELD") != std::string::npos)
+            return EActorType::Shield;
+        else if (className.find("CH_Dozer") != std::string::npos || className.find("Dozer") != std::string::npos)
+            return EActorType::Dozer;
+        else if (className.find("CH_Cloaker") != std::string::npos || className.find("Cloaker") != std::string::npos)
+            return EActorType::Cloaker;
+        else if (className.find("CH_Sniper") != std::string::npos || className.find("Sniper") != std::string::npos)
+            return EActorType::Sniper;
+        else if (className.find("CH_Grenadier") != std::string::npos || className.find("Grenadier") != std::string::npos)
+            return EActorType::Grenadier;
+        else if (className.find("CH_Taser") != std::string::npos || className.find("Taser") != std::string::npos)
+            return EActorType::Taser;
+        else if (className.find("CH_Tower") != std::string::npos || className.find("Tower") != std::string::npos)
+            return EActorType::Techie;
+        
+        // Check for guards by class name (BaseCop, ArmedCop, etc.)
+        if (className.find("BaseCop") != std::string::npos || 
+            className.find("ArmedCop") != std::string::npos ||
+            className.find("CH_Cop") != std::string::npos ||
+            (pActor->IsA(SDK::ASBZAICharacter::StaticClass()) && className.find("CH_") != std::string::npos))
+            return EActorType::Guard;
+        
+        // Check objective items by class name
+        if (className.find("BP_RFID") != std::string::npos ||
+            className.find("BP_Keycard") != std::string::npos ||
+            className.find("BP_Carried") != std::string::npos ||
+            className.find("GE_CarKeys") != std::string::npos ||
+            className.find("GA_Phone") != std::string::npos)
             return EActorType::ObjectiveItem;
         
-        if(pActor->IsA(SDK::ASBZInteractionActor::StaticClass()))
+        if (pActor->IsA(SDK::ASBZInteractionActor::StaticClass()))
             return EActorType::InteractableItem;
-
-        if(pActor->IsA(SDK::ABP_BaseValuableBag_C::StaticClass()))
+        
+        // Check for loot bags
+        if (className.find("BP_BaseValuableBag") != std::string::npos || 
+            className.find("BP_MoneyBag") != std::string::npos)
             return EActorType::LootBag;
 
         return EActorType::Other;        
@@ -478,7 +489,7 @@ namespace ESP
         pDrawList->AddText(vec2TextPos, IM_COL32(255, 255, 255, 200), sCharacterName.c_str());
     };
 
-    void DrawEnemyESP(ImDrawList* pDrawList, SDK::APlayerController* pPlayerController, SDK::ACH_BaseCop_C* pGuard, EActorType eType, EnemyESP& stSettings){
+    void DrawEnemyESP(ImDrawList* pDrawList, SDK::APlayerController* pPlayerController, SDK::ASBZAICharacter* pGuard, EActorType eType, EnemyESP& stSettings){
         pGuard->Multicast_SetMarked(stSettings.m_bOutline);
 
         SDK::USkeletalMeshComponent* pSkeletalMesh = pGuard->Mesh;
@@ -528,14 +539,22 @@ namespace ESP
                 if (DetermineActorType(pChildObj) != EActorType::ObjectiveItem)
                     continue;
                 
+                std::string childClassName = pChildObj->Class->Name.ToString();
+                std::string itemName = pChildObj->Name.ToString();
+                
+                if (childClassName.find("BlueKeycard") != std::string::npos)
+                    itemName = "Blue Keycard";
+                else if (childClassName.find("RedKeycard") != std::string::npos)
+                    itemName = "Red Keycard";
+                else if (childClassName.find("HackablePhone") != std::string::npos)
+                    itemName = "Phone";
+                else if (childClassName.find("FakeID") != std::string::npos)
+                    itemName = "Fake ID";
+                
                 pDrawList->AddText(
                     ImVec2(vec4ScreenBox.z + 5.f, vec4ScreenBox.y + flFlagsOffset),
                     IM_COL32(0, 255, 0, 255),
-                    (pChildObj->IsA(SDK::ABP_CarriedBlueKeycard_C::StaticClass()) ? "Blue Keycard" : 
-                        pChildObj->IsA(SDK::ABP_CarriedRedKeycard_C::StaticClass()) ? "Red Keycard" :
-                        pChildObj->IsA(SDK::ABP_CarriedHackablePhone_C::StaticClass()) ? "Phone" :
-                        pChildObj->IsA(SDK::ABP_CarriedFakeID_C::StaticClass()) ? "Fake ID" :
-                        pChildObj->Name.ToString()).c_str()
+                    itemName.c_str()
                 );
                 
                 flFlagsOffset += 15.f;
@@ -730,13 +749,13 @@ Default__GA_PlayerEndCycleReload_C
                 case EActorType::Grenadier:
                 case EActorType::Taser:
                 case EActorType::Techie:;
-                    vecOffset = pActor->K2_GetActorLocation() - reinterpret_cast<SDK::ACH_BaseCop_C*>(pActor)->Mesh->GetSocketLocation(SDK::UKismetStringLibrary::Conv_StringToName(L"Head"));
+                    vecOffset = pActor->K2_GetActorLocation() - reinterpret_cast<SDK::ASBZAICharacter*>(pActor)->Mesh->GetSocketLocation(SDK::UKismetStringLibrary::Conv_StringToName(L"Head"));
                     pActor->K2_SetActorRotation(vecPlayerRotation, true);
                     pActor->K2_SetActorLocation(vecLookAheadLocation + vecOffset, false, nullptr, true);
                     break;
 
                 case EActorType::Dozer:
-                    vecOffset = pActor->K2_GetActorLocation() - reinterpret_cast<SDK::ACH_BaseCop_C*>(pActor)->Mesh->GetSocketLocation(SDK::UKismetStringLibrary::Conv_StringToName(L"Head"));
+                    vecOffset = pActor->K2_GetActorLocation() - reinterpret_cast<SDK::ASBZAICharacter*>(pActor)->Mesh->GetSocketLocation(SDK::UKismetStringLibrary::Conv_StringToName(L"Head"));
                     pActor->K2_SetActorRotation(SDK::FRotator(-vecPlayerRotation.Pitch, -vecPlayerRotation.Yaw), true);
                     pActor->K2_SetActorLocation(vecLookAheadLocation + vecOffset, false, nullptr, true);
                     break;
@@ -752,7 +771,7 @@ Default__GA_PlayerEndCycleReload_C
 
             switch(infoActor.m_eType){
             case EActorType::Guard:
-                DrawEnemyESP(pDrawList, pPlayerController, reinterpret_cast<SDK::ACH_BaseCop_C*>(pActor), infoActor.m_eType, GetConfig().m_stNormalEnemies);
+                DrawEnemyESP(pDrawList, pPlayerController, reinterpret_cast<SDK::ASBZAICharacter*>(pActor), infoActor.m_eType, GetConfig().m_stNormalEnemies);
                 break;
 
             case EActorType::Shield:
@@ -762,7 +781,7 @@ Default__GA_PlayerEndCycleReload_C
             case EActorType::Grenadier:
             case EActorType::Taser:
             case EActorType::Techie:
-                DrawEnemyESP(pDrawList, pPlayerController, reinterpret_cast<SDK::ACH_BaseCop_C*>(pActor), infoActor.m_eType, GetConfig().m_stSpecialEnemies);
+                DrawEnemyESP(pDrawList, pPlayerController, reinterpret_cast<SDK::ASBZAICharacter*>(pActor), infoActor.m_eType, GetConfig().m_stSpecialEnemies);
                 break;
 
             case EActorType::ObjectiveItem:

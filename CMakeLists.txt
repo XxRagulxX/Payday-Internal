@@ -11,8 +11,8 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_MSVC_INCREMENTAL_LINKING OFF CACHE BOOL "" FORCE)
 
 # Platform / ABI checks
-if (NOT WIN32)
-    message(FATAL_ERROR "Payday builds Windows DLLs only.")
+if (NOT CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    message(FATAL_ERROR "Target system must be Windows (use -DCMAKE_TOOLCHAIN_FILE=cmake/linux.cmake on Linux).")
 endif()
 
 if (NOT MSVC)
@@ -147,7 +147,9 @@ target_include_directories(Payday3Internal SYSTEM PRIVATE
 
 # Add a fallback for undefined DUMPER7_ASSERTS macros
 # This is needed because the SDK generator doesn't generate all assertion macros
-add_compile_options(/FI"${CMAKE_CURRENT_SOURCE_DIR}/src/types/gameoffsets/DumperAssertsFix.hpp")
+# Use native path format for forced include
+file(TO_NATIVE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/src/types/gameoffsets/DumperAssertsFix.hpp" DUMPER_ASSERTS_FIX_PATH)
+add_compile_options(/FI"${DUMPER_ASSERTS_FIX_PATH}")
 
 # Compiler flags (MSVC)
 target_compile_options(Payday3Internal PRIVATE
