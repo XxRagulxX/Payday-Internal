@@ -121,8 +121,11 @@ void UObjectProcessEvent_hk(const SDK::UObject* pObject, class SDK::UFunction* p
 		return;
 	}
 
-	size_t iNameHash = std::hash<std::string>{}(pObject->Class->Name.GetRawString());
-	size_t iFuncHash = std::hash<std::string>{}(pFunction->GetName());
+	// Only process call traces when debug window is open - PERFORMANCE CRITICAL
+	if (Menu::g_bShowCallTraces)
+	{
+		size_t iNameHash = std::hash<std::string>{}(pObject->Class->Name.GetRawString());
+		size_t iFuncHash = std::hash<std::string>{}(pFunction->GetName());
 
 	std::string sClassName = pObject->GetName();
 	std::string sFnName = pFunction->GetName();
@@ -142,7 +145,9 @@ void UObjectProcessEvent_hk(const SDK::UObject* pObject, class SDK::UFunction* p
 		for (pStruct = static_cast<const SDK::UStruct*>(pStruct->SuperStruct); pStruct != nullptr; pStruct = static_cast<const SDK::UStruct*>(pStruct->SuperStruct))
 			entry.m_vecSubClasses.push_back(pStruct->Name.GetRawString());
 		
+		
 		Menu::g_mapCallTraces.try_emplace(iNameHash, std::move(entry));
+	}
 	}
 		
 	static const auto nameBlueprintUpdateCamera = SDK::UKismetStringLibrary::Conv_StringToName(L"BlueprintUpdateCamera");
@@ -170,76 +175,6 @@ void UObjectProcessEvent_hk(const SDK::UObject* pObject, class SDK::UFunction* p
 		return;
 	}
 
-	if(pObject->IsA(SDK::ASBZKeypadBase::StaticClass()))
-	{
-		auto pKeypad = reinterpret_cast<SDK::ASBZKeypadBase*>(const_cast<SDK::UObject*>(pObject));
-		
-		uint8_t iActiveKey = 0;
-		switch(pKeypad->Inputs)
-		{
-		case(0):
-			iActiveKey = pKeypad->Code / 1000;
-			break;
-
-		case(1):
-			iActiveKey = (pKeypad->Code / 100) % 10;
-			break;
-			
-		case(2):
-			iActiveKey = (pKeypad->Code / 10) % 10;
-			break;
-
-		case(3):
-			iActiveKey = pKeypad->Code % 10;
-			break;
-
-		default:
-			iActiveKey = (pKeypad->GuessedCode != pKeypad->Code) ? 10 : 11;
-			break;
-		}
-
-		for (int i = 0; i < pKeypad->KeypadInteractableComponentArray.Num(); i++)
-		{
-			auto pKey = pKeypad->KeypadInteractableComponentArray[i];
-			if(!pKey)
-				continue;
-			
-			pKey->SetLocalEnabled(i == static_cast<int>(iActiveKey));
-		}
-		//pKeypad->GuessedCode = pKeypad->Code;
-		
-		UObjectProcessEvent_o(pObject, pFunction, pParams);
-		return;
-	}
-
-	if(pObject->IsA(SDK::ACH_PlayerBase_C::StaticClass()) && pFunction->Name == nameServerMovePacked)
-	{
-
-		SDK::ASBZPlayerCharacter* pLocalPlayer = GetLocalPlayer();
-		if (pLocalPlayer && pLocalPlayer->Interactor)
-		{
-			auto pInteractor = pLocalPlayer->Interactor;
-			auto pInteraction = pInteractor->GetCurrentInteraction();
-			if(pInteraction){
-				static std::chrono::time_point<std::chrono::steady_clock> timeInteractLast = std::chrono::steady_clock::now();
-
-				bool bSkipInstantInteraction = false;
-				// Bags get us kicked ;|
-				if(auto pOwner = pInteraction->GetOwner(); pOwner)
-					bSkipInstantInteraction = pOwner->IsA(SDK::ASBZBagItem::StaticClass());
-				
-
-				if(!bSkipInstantInteraction && std::chrono::steady_clock::now() - timeInteractLast > g_durationPing){
-					pInteractor->Server_CompleteInteraction(pInteraction, pInteractor->InteractId);
-					pInteractor->Multicast_CompletedInteraction(pInteraction, false);
-
-					// Dirty hack to prevent completing the interaction multiple times.
-					timeInteractLast = std::chrono::steady_clock::now();
-				}
-			}
-		}
-	}
-
 	if(pObject->IsA(SDK::ACH_PlayerBase_C::StaticClass()) || pObject->IsA(SDK::APlayerController::StaticClass()) || pObject->IsA(SDK::APlayerCameraManager::StaticClass()) || pObject->IsA(SDK::UCharacterMovementComponent::StaticClass()))
 	{
 		static const std::string strServerMovePacked = "ServerMovePacked";
@@ -251,14 +186,17 @@ void UObjectProcessEvent_hk(const SDK::UObject* pObject, class SDK::UFunction* p
 		}
 	}
 
+
 	if(pObject->IsA(SDK::ASBZPlayerState::StaticClass())){
-		if(sFnName.find("Multicast_SetMiniGameState") != std::string::npos)
+		if(pFunction->GetName().find("Multicast_SetMiniGameState") != std::string::npos)
 		{
 			UObjectProcessEvent_o(pObject, pFunction, pParams);
 
 			SDK::ASBZPlayerCharacter* pLocalPlayer = GetLocalPlayer();
 			if(pLocalPlayer && pLocalPlayer->PlayerState)
 				pLocalPlayer->SBZPlayerState->Server_SetMiniGameState(SDK::EPD3MiniGameState::Success);
+			
+
 			
 
 			return;

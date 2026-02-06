@@ -14,6 +14,10 @@ namespace Menu
     bool g_bCallTraceFilterSubclasses = false;
     std::string g_sCallTraceFilter{};
     std::map<size_t, CallTraceEntry_t> g_mapCallTraces{};
+    
+    // Feature toggles for performance
+    bool g_bInstantInteract = false;
+    bool g_bAutoKeypad = false;
 
     void CallTraceEntry_t::Draw()
     {
@@ -52,6 +56,10 @@ namespace Menu
 
     void PreDraw()
     {
+        // Only run ESP if enabled - PERFORMANCE CRITICAL
+        if (!ESP::GetConfig().bESP)
+            return;
+            
         SDK::UWorld* pGWorld = SDK::UWorld::GetWorld();
         if (!pGWorld)
             return;
@@ -77,9 +85,7 @@ namespace Menu
 
     void DrawEnemyESPSection(const char* szType, ESP::EnemyESP& stSettings)
     {
-        if (!ImGui::BeginCombo(
-            szType,
-            std::format("{}###{}", stSettings.m_sPreviewText, szType).c_str()))
+        if (!ImGui::BeginCombo(szType, stSettings.m_sPreviewText.c_str()))
             return;
 
         bool changed = false;
@@ -97,78 +103,61 @@ namespace Menu
 
     void Draw(bool& bShowMenu)
     {
-        if (!bShowMenu)
-            return;
-
         auto& espConfig = ESP::GetConfig();
 
-        std::string windowTitle = std::format("Payday 3 Internal - {}", CURRENT_VERSION);
-        ImGui::Begin(windowTitle.c_str(), &bShowMenu, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse);
-        // Header
-        ImGui::Text("DirectX 12 Hook Active");
-        ImGui::Text("Press INSERT to toggle menu");
-        ImGui::Separator();
-
-        ImGui::Checkbox("Client Move", &g_bClientMove);
+        ImGui::Begin("Payday 3 Internal", &bShowMenu, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse);
         
         // Performance metrics
-        ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 
-            1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+        ImGui::Text("FPS: %.1f (%.3f ms)", ImGui::GetIO().Framerate, 1000.0f / ImGui::GetIO().Framerate);
+        ImGui::Separator();
+        
+        // Gameplay features
+        if (ImGui::CollapsingHeader("Gameplay", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            ImGui::Checkbox("No Client Move", &g_bClientMove);
+        }
         
         ImGui::Separator();
         
-        ImGui::Checkbox("Enable ESP", &espConfig.bESP);
-        if (espConfig.bESP) {
-            ImGui::Indent();
-
-            DrawEnemyESPSection("Normal Enemies", espConfig.m_stNormalEnemies);
-            DrawEnemyESPSection("Special Enemies", espConfig.m_stSpecialEnemies);
+        // ESP features
+        if (ImGui::CollapsingHeader("ESP", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            ImGui::Checkbox("Enable ESP", &espConfig.bESP);
+            
+            if (espConfig.bESP)
+            {
+                ImGui::Indent();
+                DrawEnemyESPSection("Normal Enemies", espConfig.m_stNormalEnemies);
+                DrawEnemyESPSection("Special Enemies", espConfig.m_stSpecialEnemies);
+                ImGui::Unindent();
+            }
         }
 
-
-//#ifdef _DEBUG
-//            ImGui::Checkbox("Debug Draw Bone Indices", &espConfig.bDebugDrawBoneIndices);
-//            ImGui::Checkbox("Debug Draw Bone Names Instead of Indices", &espConfig.bDebugDrawBoneNames);
-//#endif
-//            
-//#ifdef _DEBUG
-//            ImGui::Checkbox("Debug Skeleton", &espConfig.bDebugSkeleton);
-//            if (espConfig.bDebugSkeleton) {
-//                ImGui::Indent();
-//                ImGui::Checkbox("Debug Skeleton Draw Bone Indices", &espConfig.bDebugSkeletonDrawBoneIndices);
-//                ImGui::Checkbox("Debug Skeleton Draw Bone Names Instead of Indices", &espConfig.bDebugSkeletonDrawBoneNames);
-//                ImGui::Unindent();
-//            }
-//#endif
-//            ImGui::Unindent();
-//        }
-//#ifdef _DEBUG
-//        ImGui::Checkbox("Debug ESP (Show Class Names)", &espConfig.bDebugESP);
-//        ImGui::Separator();
-//        ImGui::Checkbox("Show Call Traces", &g_bShowCallTraces);
-//#endif
-
         ImGui::Separator();
         
-        // Unload button
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.2f, 0.2f, 1.0f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1.0f, 0.3f, 0.3f, 1.0f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.6f, 0.1f, 0.1f, 1.0f));
+        // Debug section (only in debug builds)
+#ifdef _DEBUG
+        if (ImGui::CollapsingHeader("Debug"))
+        {
+            ImGui::Checkbox("Show Call Traces", &g_bShowCallTraces);
+        }
+        ImGui::Separator();
+#endif
         
-        if (ImGui::Button("Unload Cheat", ImVec2(-1, 0)))
+        // Unload button
+        if (ImGui::Button("Unload", ImVec2(-1, 0)))
         {
             ImGui::OpenPopup("Confirm Unload");
         }
         
-        ImGui::PopStyleColor(3);
-        
         // Unload confirmation popup
         if (ImGui::BeginPopupModal("Confirm Unload", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
         {
-            ImGui::Text("Are you sure you want to unload the cheat?");
+            ImGui::Text("Are you sure you want to unload?");
             ImGui::Separator();
 
-            if (ImGui::Button("Yes", ImVec2(120, 0))) {
+            if (ImGui::Button("Yes", ImVec2(120, 0)))
+            {
                 Globals::g_bUnloadRequested = true;
                 ImGui::CloseCurrentPopup();
             }
@@ -183,42 +172,44 @@ namespace Menu
 
         ImGui::End();
 
-
+        // Call traces window (separate, only shown when enabled)
         if (g_bShowCallTraces)
         {
             ImGui::Begin("Call Traces", &g_bShowCallTraces);
-        if(ImGui::Button("Clear"))
-            ImGui::OpenPopup("Confirm Clear");
             
-        if (ImGui::BeginPopupModal("Confirm Clear", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
-        {
-            ImGui::Text("Are you sure you want to clear all entries?");
-            ImGui::Separator();
+            if(ImGui::Button("Clear"))
+                ImGui::OpenPopup("Confirm Clear");
+                
+            if (ImGui::BeginPopupModal("Confirm Clear", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+            {
+                ImGui::Text("Are you sure you want to clear all entries?");
+                ImGui::Separator();
 
-            if (ImGui::Button("Yes")) {
-                ImGui::CloseCurrentPopup();
-                g_mapCallTraces.clear();
+                if (ImGui::Button("Yes", ImVec2(120, 0)))
+                {
+                    ImGui::CloseCurrentPopup();
+                    g_mapCallTraces.clear();
+                }
+
+                ImGui::SameLine();
+
+                if (ImGui::Button("No", ImVec2(120, 0)))
+                    ImGui::CloseCurrentPopup();
+
+                ImGui::EndPopup();
             }
-
+            
+            ImGui::InputText("##Filter", g_szCallTraceFilter, sizeof(g_szCallTraceFilter));
             ImGui::SameLine();
+            ImGui::Checkbox("##Filter Use Subclasses", &g_bCallTraceFilterSubclasses);
 
-            if (ImGui::Button("No"))
-                ImGui::CloseCurrentPopup();
+            g_sCallTraceFilter = g_szCallTraceFilter;
 
-            ImGui::EndPopup();
-        }
-        
-        ImGui::InputText("##Filter", g_szCallTraceFilter, sizeof(g_szCallTraceFilter));
-        ImGui::SameLine();
-        ImGui::Checkbox("##Filter Use Subclasses", &g_bCallTraceFilterSubclasses);
-
-        g_sCallTraceFilter = g_szCallTraceFilter;
-
-        ImGui::Separator();
-        for (auto& pairEntry : g_mapCallTraces)
-            pairEntry.second.Draw();
-        
-        ImGui::End();
+            ImGui::Separator();
+            for (auto& pairEntry : g_mapCallTraces)
+                pairEntry.second.Draw();
+            
+            ImGui::End();
         }
     }
 

@@ -167,6 +167,9 @@ namespace Dx12Hook
 	// Hooked Present
 	static HRESULT __stdcall HookedPresent(IDXGISwapChain3* pSwapChain, UINT SyncInterval, UINT Flags)
 	{
+		// FIX: Force SyncInterval to 0 to prevent FPS capping issues
+		SyncInterval = 0;
+		
 		static bool bInit = false;
 
 		if (!bInit)
@@ -270,10 +273,18 @@ namespace Dx12Hook
 		ImGui_ImplWin32_NewFrame();
 		ImGui::NewFrame();
 
-		// Render ImGui content
+		// Render ImGui content (only when menu is visible for performance)
 		ImGui::GetIO().MouseDrawCursor = g_bShowMenu;
+		
+		// PreDraw handles ESP which should run even when menu is closed
 		Menu::PreDraw();
-		Menu::Draw(g_bShowMenu);
+		
+		// Only draw menu UI when visible
+		if (g_bShowMenu)
+		{
+			Menu::Draw(g_bShowMenu);
+		}
+		
 		Menu::PostDraw();
 
 		// Always end the frame (required by ImGui)
@@ -295,19 +306,14 @@ namespace Dx12Hook
 		barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
 		barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
 
-		// Wait for GPU to finish previous work to avoid state conflicts
-		ID3D12Fence* pFence = nullptr;
-		if (SUCCEEDED(g_pd3dDevice->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&pFence))))
+		// Lightweight GPU sync - only when drawing ImGui content
+		ImDrawData* pDrawData = ImGui::GetDrawData();
+		bool bNeedRender = (pDrawData && pDrawData->Valid && pDrawData->TotalVtxCount > 0);
+		
+		if (!bNeedRender)
 		{
-			HANDLE hEvent = CreateEventW(nullptr, FALSE, FALSE, nullptr);
-			if (hEvent)
-			{
-				g_pd3dCommandQueue->Signal(pFence, 1);
-				pFence->SetEventOnCompletion(1, hEvent);
-				WaitForSingleObject(hEvent, 100); // Short timeout
-				CloseHandle(hEvent);
-			}
-			pFence->Release();
+			// Nothing to render, skip all GPU work
+			return oPresent(pSwapChain, SyncInterval, Flags);
 		}
 
 		// Execute rendering commands
@@ -317,11 +323,8 @@ namespace Dx12Hook
 		g_pd3dCommandList->SetDescriptorHeaps(1, &g_pd3dSrvDescHeap);
 
 		// Render ImGui draw data
-		ImDrawData* pDrawData = ImGui::GetDrawData();
-		if (pDrawData && pDrawData->Valid)
-		{
-			ImGui_ImplDX12_RenderDrawData(pDrawData, g_pd3dCommandList);
-		}
+		ImGui_ImplDX12_RenderDrawData(pDrawData, g_pd3dCommandList);
+		
 		barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
 		barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
 		g_pd3dCommandList->ResourceBarrier(1, &barrier);
